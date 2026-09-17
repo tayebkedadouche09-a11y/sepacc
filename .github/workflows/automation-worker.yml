@@ -1,0 +1,26 @@
+name: NUMI Automation Worker
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 * * * *"
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Process queued NUMI jobs
+        env:
+          NUMI_AUTOMATION_URL: ${{ secrets.NUMI_AUTOMATION_URL }}
+          NUMI_AUTOMATION_SECRET: ${{ secrets.NUMI_AUTOMATION_SECRET }}
+        run: |
+          test -n "$NUMI_AUTOMATION_URL"
+          test -n "$NUMI_AUTOMATION_SECRET"
+          curl --fail-with-body --silent --show-error \
+            -X POST "$NUMI_AUTOMATION_URL/api/automation/worker" \
+            -H "x-numi-worker-secret: $NUMI_AUTOMATION_SECRET" \
+            -H "content-type: application/json"
+          curl --fail-with-body --silent --show-error \
+            -X POST "$NUMI_AUTOMATION_URL/api/monitor/demos" \
+            -H "x-numi-worker-secret: $NUMI_AUTOMATION_SECRET" \
+            -H "content-type: application/json"

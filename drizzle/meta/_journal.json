@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1789597562724,
+      "tag": "0000_messy_stepford_cuckoos",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1789597715958,
+      "tag": "0001_slippery_siren",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1789598732660,
+      "tag": "0002_shiny_captain_stacy",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1789600226093,
+      "tag": "0003_strange_magdalene",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1789601000000,
+      "tag": "0004_numi_os_hardening",
+      "breakpoints": true
+    }
+  ]
+}
