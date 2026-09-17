@@ -16,30 +16,28 @@ import { ENV } from "./env";
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
     const server = net.createServer();
-    server.listen(port, () => {
-      server.close(() => resolve(true));
-    });
+    server.listen(port, () => server.close(() => resolve(true)));
     server.on("error", () => resolve(false));
   });
 }
 
-async function findAvailablePort(startPort: number = 3000): Promise<number> {
+async function findAvailablePort(startPort = 3000): Promise<number> {
   for (let port = startPort; port < startPort + 20; port++) {
-    if (await isPortAvailable(port)) {
-      return port;
-    }
+    if (await isPortAvailable(port)) return port;
   }
   throw new Error(`No available port found starting from ${startPort}`);
 }
 
-async function startServer() {
+export async function createApp(options: { development?: boolean } = {}) {
+  const development = options.development ?? process.env.NODE_ENV === "development";
   const app = express();
   const server = createServer(app);
+
   app.get("/api/health", async (_req, res) => {
     res.json({
       ok: true,
       service: "numi",
-      version: "4.0.0",
+      version: "4.1.0",
       integrations: {
         database: Boolean(ENV.databaseUrl),
         stripe: Boolean(ENV.stripeSecretKey && ENV.stripeWebhookSecret && ENV.appOrigin),
@@ -52,6 +50,7 @@ async function startServer() {
       },
     });
   });
+
   app.post("/api/monitor/demos", async (req, res) => {
     try {
       if (!ENV.automationWorkerSecret || req.header("x-numi-worker-secret") !== ENV.automationWorkerSecret) return res.status(401).json({ error: "Unauthorized" });
@@ -62,6 +61,7 @@ async function startServer() {
       res.status(500).json({ error: "Demo monitor failed" });
     }
   });
+
   app.post("/api/automation/worker", async (req, res) => {
     try {
       if (!ENV.automationWorkerSecret || req.header("x-numi-worker-secret") !== ENV.automationWorkerSecret) return res.status(401).json({ error: "Unauthorized" });
@@ -72,6 +72,7 @@ async function startServer() {
       res.status(500).json({ error: "Worker failed" });
     }
   });
+
   app.post("/api/chargily/webhook", express.json(), async (req, res) => {
     try {
       const body = req.body as Record<string, any>;
@@ -88,6 +89,7 @@ async function startServer() {
       res.status(400).json({ error: "Webhook rejected" });
     }
   });
+
   app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async (req, res) => {
     try {
       const result = await handleStripeWebhook(req.body as Buffer, req.header("stripe-signature"));
@@ -97,36 +99,25 @@ async function startServer() {
       res.status(400).json({ error: "Webhook rejected" });
     }
   });
-  // Configure body parser with larger size limit for file uploads
+
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
   registerOAuthRoutes(app);
-  // tRPC API
-  app.use(
-    "/api/trpc",
-    createExpressMiddleware({
-      router: appRouter,
-      createContext,
-    })
-  );
-  // development mode uses Vite, production mode uses static files
-  if (process.env.NODE_ENV === "development") {
-    await setupVite(app, server);
-  } else {
-    serveStatic(app);
-  }
+  app.use("/api/trpc", createExpressMiddleware({ router: appRouter, createContext }));
 
-  const preferredPort = parseInt(process.env.PORT || "3000");
-  const port = await findAvailablePort(preferredPort);
+  if (development) await setupVite(app, server);
+  else serveStatic(app);
 
-  if (port !== preferredPort) {
-    console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
-  }
-
-  server.listen(port, () => {
-    console.log(`Server running on http://localhost:${port}/`);
-  });
+  return { app, server };
 }
 
-startServer().catch(console.error);
+async function startServer() {
+  const { server } = await createApp({ development: true });
+  const preferredPort = parseInt(process.env.PORT || "3000", 10);
+  const port = await findAvailablePort(preferredPort);
+  if (port !== preferredPort) console.log(`Port ${preferredPort} is busy, using port ${port} instead`);
+  server.listen(port, () => console.log(`Server running on http://localhost:${port}/`));
+}
+
+if (!process.env.VERCEL) startServer().catch(console.error);
