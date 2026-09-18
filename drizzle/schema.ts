@@ -1,70 +1,70 @@
 import {
   boolean,
-  decimal,
+  numeric,
   index,
-  int,
-  mysqlEnum,
-  mysqlTable,
+  integer,
+  pgTable,
+  serial,
   text,
   timestamp,
   uniqueIndex,
   varchar,
-} from "drizzle-orm/mysql-core";
+} from "drizzle-orm/pg-core";
 
-export const users = mysqlTable("users", {
-  id: int("id").autoincrement().primaryKey(),
+export const users = pgTable("users", {
+  id: serial("id").primaryKey(),
   openId: varchar("openId", { length: 64 }).notNull().unique(),
   name: text("name"),
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  role: text("role").default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
 });
 
-export const profiles = mysqlTable("profiles", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+export const profiles = pgTable("profiles", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
   avatarUrl: text("avatarUrl"),
   company: varchar("company", { length: 180 }),
   website: varchar("website", { length: 320 }),
   bio: text("bio"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (table) => ({ userIdx: uniqueIndex("profiles_user_unique").on(table.userId) }));
 
-export const categories = mysqlTable("categories", {
-  id: int("id").autoincrement().primaryKey(),
+export const categories = pgTable("categories", {
+  id: serial("id").primaryKey(),
   slug: varchar("slug", { length: 120 }).notNull(),
   name: varchar("name", { length: 120 }).notNull(),
   description: text("description"),
-  status: mysqlEnum("status", ["draft", "published", "archived"]).default("published").notNull(),
-  sortOrder: int("sortOrder").default(0).notNull(),
+  status: text("status").default("published").notNull(),
+  sortOrder: integer("sortOrder").default(0).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (table) => ({ slugIdx: uniqueIndex("categories_slug_unique").on(table.slug), statusIdx: index("categories_status_idx").on(table.status), orderIdx: index("categories_order_idx").on(table.sortOrder) }));
 
-export const products = mysqlTable("products", {
-  id: int("id").autoincrement().primaryKey(),
+export const products = pgTable("products", {
+  id: serial("id").primaryKey(),
   slug: varchar("slug", { length: 160 }).notNull(),
   name: varchar("name", { length: 160 }).notNull(),
   tagline: varchar("tagline", { length: 240 }).notNull(),
   description: text("description").notNull(),
   category: varchar("category", { length: 80 }).notNull(),
-  categoryId: int("categoryId").references(() => categories.id, { onDelete: "set null" }),
-  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  categoryId: integer("categoryId").references(() => categories.id, { onDelete: "set null" }),
+  price: numeric("price", { precision: 10, scale: 2 }).notNull(),
   currency: varchar("currency", { length: 8 }).default("EUR").notNull(),
-  status: mysqlEnum("status", ["draft", "published", "archived"]).default("draft").notNull(),
+  status: text("status").default("draft").notNull(),
   heroImage: text("heroImage").notNull(),
   demoUrl: text("demoUrl"),
   sourceRepoUrl: text("sourceRepoUrl"),
   sourceRepoBranch: varchar("sourceRepoBranch", { length: 120 }).default("main"),
-  provisioningMode: mysqlEnum("provisioningMode", ["manual", "external", "native"]).default("manual").notNull(),
-  demoStatus: mysqlEnum("demoStatus", ["unknown", "healthy", "degraded", "offline"]).default("unknown").notNull(),
+  provisioningMode: text("provisioningMode").default("manual").notNull(),
+  demoStatus: text("demoStatus").default("unknown").notNull(),
   lastDemoCheckAt: timestamp("lastDemoCheckAt"),
-  demoHttpStatus: int("demoHttpStatus"),
-  demoLatencyMs: int("demoLatencyMs"),
+  demoHttpStatus: integer("demoHttpStatus"),
+  demoLatencyMs: integer("demoLatencyMs"),
   requirements: text("requirements"),
   license: text("license"),
   included: text("included"),
@@ -72,99 +72,99 @@ export const products = mysqlTable("products", {
   seoTitle: varchar("seoTitle", { length: 180 }),
   seoDescription: text("seoDescription"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (table) => ({ slugIdx: uniqueIndex("products_slug_unique").on(table.slug), statusIdx: index("products_status_idx").on(table.status) }));
 
-export const productImages = mysqlTable("product_images", {
-  id: int("id").autoincrement().primaryKey(),
-  productId: int("productId").notNull().references(() => products.id, { onDelete: "cascade" }),
+export const productImages = pgTable("product_images", {
+  id: serial("id").primaryKey(),
+  productId: integer("productId").notNull().references(() => products.id, { onDelete: "cascade" }),
   url: text("url").notNull(),
   alt: varchar("alt", { length: 240 }).notNull(),
-  kind: mysqlEnum("kind", ["hero", "screenshot", "preview"]).default("screenshot").notNull(),
-  sortOrder: int("sortOrder").default(0).notNull(),
+  kind: text("kind").default("screenshot").notNull(),
+  sortOrder: integer("sortOrder").default(0).notNull(),
 }, (table) => ({ productIdx: index("product_images_product_idx").on(table.productId) }));
 
-export const productFeatures = mysqlTable("product_features", {
-  id: int("id").autoincrement().primaryKey(),
-  productId: int("productId").notNull().references(() => products.id, { onDelete: "cascade" }),
+export const productFeatures = pgTable("product_features", {
+  id: serial("id").primaryKey(),
+  productId: integer("productId").notNull().references(() => products.id, { onDelete: "cascade" }),
   title: varchar("title", { length: 140 }).notNull(),
   description: text("description").notNull(),
-  sortOrder: int("sortOrder").default(0).notNull(),
+  sortOrder: integer("sortOrder").default(0).notNull(),
 }, (table) => ({ productIdx: index("product_features_product_idx").on(table.productId) }));
 
-export const productTechStack = mysqlTable("product_tech_stack", {
-  id: int("id").autoincrement().primaryKey(),
-  productId: int("productId").notNull().references(() => products.id, { onDelete: "cascade" }),
+export const productTechStack = pgTable("product_tech_stack", {
+  id: serial("id").primaryKey(),
+  productId: integer("productId").notNull().references(() => products.id, { onDelete: "cascade" }),
   name: varchar("name", { length: 80 }).notNull(),
   category: varchar("category", { length: 80 }),
-  sortOrder: int("sortOrder").default(0).notNull(),
+  sortOrder: integer("sortOrder").default(0).notNull(),
 }, (table) => ({ productIdx: index("product_tech_product_idx").on(table.productId) }));
 
-export const productVersions = mysqlTable("product_versions", {
-  id: int("id").autoincrement().primaryKey(),
-  productId: int("productId").notNull().references(() => products.id, { onDelete: "cascade" }),
+export const productVersions = pgTable("product_versions", {
+  id: serial("id").primaryKey(),
+  productId: integer("productId").notNull().references(() => products.id, { onDelete: "cascade" }),
   version: varchar("version", { length: 40 }).notNull(),
   changelog: text("changelog"),
   releaseDate: timestamp("releaseDate").defaultNow().notNull(),
   isCurrent: boolean("isCurrent").default(false).notNull(),
 }, (table) => ({ productIdx: index("product_versions_product_idx").on(table.productId) }));
 
-export const productMedia = mysqlTable("product_media", {
-  id: int("id").autoincrement().primaryKey(),
-  productId: int("productId").notNull().references(() => products.id, { onDelete: "cascade" }),
-  kind: mysqlEnum("kind", ["video", "motion", "embed"]).notNull(),
+export const productMedia = pgTable("product_media", {
+  id: serial("id").primaryKey(),
+  productId: integer("productId").notNull().references(() => products.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(),
   url: text("url").notNull(),
   posterUrl: text("posterUrl"),
   metadata: text("metadata"),
 }, (table) => ({ productIdx: index("product_media_product_idx").on(table.productId) }));
 
-export const orders = mysqlTable("orders", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull().references(() => users.id),
-  status: mysqlEnum("status", ["pending", "payment_verified", "paid", "fulfilled", "cancelled"]).default("pending").notNull(),
-  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
+export const orders = pgTable("orders", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull().references(() => users.id),
+  status: text("status").default("pending").notNull(),
+  subtotal: numeric("subtotal", { precision: 10, scale: 2 }).notNull(),
   currency: varchar("currency", { length: 8 }).default("EUR").notNull(),
   provider: varchar("provider", { length: 80 }),
   providerReference: varchar("providerReference", { length: 180 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (table) => ({ userIdx: index("orders_user_idx").on(table.userId), statusIdx: index("orders_status_idx").on(table.status) }));
 
-export const orderItems = mysqlTable("order_items", {
-  id: int("id").autoincrement().primaryKey(),
-  orderId: int("orderId").notNull().references(() => orders.id, { onDelete: "cascade" }),
-  productId: int("productId").notNull().references(() => products.id),
+export const orderItems = pgTable("order_items", {
+  id: serial("id").primaryKey(),
+  orderId: integer("orderId").notNull().references(() => orders.id, { onDelete: "cascade" }),
+  productId: integer("productId").notNull().references(() => products.id),
   productName: varchar("productName", { length: 160 }).notNull(),
-  unitPrice: decimal("unitPrice", { precision: 10, scale: 2 }).notNull(),
+  unitPrice: numeric("unitPrice", { precision: 10, scale: 2 }).notNull(),
   licenseType: varchar("licenseType", { length: 80 }).default("single-project").notNull(),
 }, (table) => ({ orderIdx: index("order_items_order_idx").on(table.orderId) }));
 
-export const payments = mysqlTable("payments", {
-  id: int("id").autoincrement().primaryKey(),
-  orderId: int("orderId").notNull().references(() => orders.id, { onDelete: "cascade" }),
-  status: mysqlEnum("status", ["pending", "verified", "failed", "refunded"]).default("pending").notNull(),
+export const payments = pgTable("payments", {
+  id: serial("id").primaryKey(),
+  orderId: integer("orderId").notNull().references(() => orders.id, { onDelete: "cascade" }),
+  status: text("status").default("pending").notNull(),
   provider: varchar("provider", { length: 80 }),
   providerPaymentId: varchar("providerPaymentId", { length: 180 }),
-  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
   currency: varchar("currency", { length: 8 }).default("EUR").notNull(),
   verifiedAt: timestamp("verifiedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => ({ orderIdx: uniqueIndex("payments_order_unique").on(table.orderId) }));
 
-export const customerPurchases = mysqlTable("customer_purchases", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
-  productId: int("productId").notNull().references(() => products.id),
-  orderItemId: int("orderItemId").notNull().references(() => orderItems.id),
+export const customerPurchases = pgTable("customer_purchases", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+  productId: integer("productId").notNull().references(() => products.id),
+  orderItemId: integer("orderItemId").notNull().references(() => orderItems.id),
   licenseKey: varchar("licenseKey", { length: 120 }).notNull().unique(),
   accessGranted: boolean("accessGranted").default(false).notNull(),
   purchasedAt: timestamp("purchasedAt").defaultNow().notNull(),
 }, (table) => ({ userIdx: index("purchases_user_idx").on(table.userId), productIdx: index("purchases_product_idx").on(table.productId) }));
 
-export const deliveries = mysqlTable("deliveries", {
-  id: int("id").autoincrement().primaryKey(),
-  purchaseId: int("purchaseId").notNull().references(() => customerPurchases.id, { onDelete: "cascade" }),
-  status: mysqlEnum("status", ["queued", "provisioning", "ready", "blocked"]).default("queued").notNull(),
+export const deliveries = pgTable("deliveries", {
+  id: serial("id").primaryKey(),
+  purchaseId: integer("purchaseId").notNull().references(() => customerPurchases.id, { onDelete: "cascade" }),
+  status: text("status").default("queued").notNull(),
   instanceUrl: text("instanceUrl"),
   adminUrl: text("adminUrl"),
   sourceReady: boolean("sourceReady").default(false).notNull(),
@@ -173,52 +173,52 @@ export const deliveries = mysqlTable("deliveries", {
   sourceRepoUrl: text("sourceRepoUrl"),
   deploymentId: varchar("deploymentId", { length: 180 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (table) => ({ purchaseIdx: uniqueIndex("deliveries_purchase_unique").on(table.purchaseId) }));
 
-export const downloadAssets = mysqlTable("download_assets", {
-  id: int("id").autoincrement().primaryKey(),
-  purchaseId: int("purchaseId").notNull().references(() => customerPurchases.id, { onDelete: "cascade" }),
-  kind: mysqlEnum("kind", ["source", "documentation", "license"]).notNull(),
+export const downloadAssets = pgTable("download_assets", {
+  id: serial("id").primaryKey(),
+  purchaseId: integer("purchaseId").notNull().references(() => customerPurchases.id, { onDelete: "cascade" }),
+  kind: text("kind").notNull(),
   fileKey: text("fileKey").notNull(),
   checksum: varchar("checksum", { length: 128 }),
   expiresAt: timestamp("expiresAt"),
 }, (table) => ({ purchaseIdx: index("download_assets_purchase_idx").on(table.purchaseId) }));
 
-export const licenses = mysqlTable("licenses", {
-  id: int("id").autoincrement().primaryKey(),
-  purchaseId: int("purchaseId").notNull().references(() => customerPurchases.id, { onDelete: "cascade" }),
+export const licenses = pgTable("licenses", {
+  id: serial("id").primaryKey(),
+  purchaseId: integer("purchaseId").notNull().references(() => customerPurchases.id, { onDelete: "cascade" }),
   licenseKey: varchar("licenseKey", { length: 120 }).notNull().unique(),
   type: varchar("type", { length: 80 }).default("single-project").notNull(),
   issuedAt: timestamp("issuedAt").defaultNow().notNull(),
   revokedAt: timestamp("revokedAt"),
 });
 
-export const reviews = mysqlTable("reviews", {
-  id: int("id").autoincrement().primaryKey(),
-  productId: int("productId").notNull().references(() => products.id, { onDelete: "cascade" }),
-  userId: int("userId").notNull().references(() => users.id),
-  rating: int("rating").notNull(),
+export const reviews = pgTable("reviews", {
+  id: serial("id").primaryKey(),
+  productId: integer("productId").notNull().references(() => products.id, { onDelete: "cascade" }),
+  userId: integer("userId").notNull().references(() => users.id),
+  rating: integer("rating").notNull(),
   title: varchar("title", { length: 180 }),
   body: text("body"),
-  status: mysqlEnum("status", ["pending", "published", "hidden"]).default("pending").notNull(),
+  status: text("status").default("pending").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => ({ productIdx: index("reviews_product_idx").on(table.productId) }));
 
-export const coupons = mysqlTable("coupons", {
-  id: int("id").autoincrement().primaryKey(),
+export const coupons = pgTable("coupons", {
+  id: serial("id").primaryKey(),
   code: varchar("code", { length: 60 }).notNull().unique(),
-  discountType: mysqlEnum("discountType", ["percent", "fixed"]).notNull(),
-  discountValue: decimal("discountValue", { precision: 10, scale: 2 }).notNull(),
+  discountType: text("discountType").notNull(),
+  discountValue: numeric("discountValue", { precision: 10, scale: 2 }).notNull(),
   active: boolean("active").default(true).notNull(),
   expiresAt: timestamp("expiresAt"),
-  maxUses: int("maxUses"),
-  usedCount: int("usedCount").default(0).notNull(),
+  maxUses: integer("maxUses"),
+  usedCount: integer("usedCount").default(0).notNull(),
 });
 
-export const notifications = mysqlTable("notifications", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+export const notifications = pgTable("notifications", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
   type: varchar("type", { length: 80 }).notNull(),
   title: varchar("title", { length: 180 }).notNull(),
   body: text("body").notNull(),
@@ -226,26 +226,26 @@ export const notifications = mysqlTable("notifications", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => ({ userIdx: index("notifications_user_idx").on(table.userId) }));
 
-export const supportTickets = mysqlTable("support_tickets", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId").notNull().references(() => users.id),
+export const supportTickets = pgTable("support_tickets", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId").notNull().references(() => users.id),
   subject: varchar("subject", { length: 180 }).notNull(),
-  status: mysqlEnum("status", ["open", "pending", "resolved", "closed"]).default("open").notNull(),
-  priority: mysqlEnum("priority", ["normal", "high", "urgent"]).default("normal").notNull(),
+  status: text("status").default("open").notNull(),
+  priority: text("priority").default("normal").notNull(),
   body: text("body").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (table) => ({ userIdx: index("support_tickets_user_idx").on(table.userId) }));
 
-export const deployments = mysqlTable("deployments", {
-  id: int("id").autoincrement().primaryKey(),
-  purchaseId: int("purchaseId").references(() => customerPurchases.id, { onDelete: "set null" }),
-  productId: int("productId").references(() => products.id, { onDelete: "set null" }),
+export const deployments = pgTable("deployments", {
+  id: serial("id").primaryKey(),
+  purchaseId: integer("purchaseId").references(() => customerPurchases.id, { onDelete: "set null" }),
+  productId: integer("productId").references(() => products.id, { onDelete: "set null" }),
   provider: varchar("provider", { length: 80 }).notNull(),
   externalId: varchar("externalId", { length: 180 }),
   repositoryUrl: text("repositoryUrl"),
-  environment: mysqlEnum("environment", ["staging", "production"]).default("production").notNull(),
-  status: mysqlEnum("status", ["queued", "running", "succeeded", "failed", "rolled_back"]).default("queued").notNull(),
+  environment: text("environment").default("production").notNull(),
+  status: text("status").default("queued").notNull(),
   commitSha: varchar("commitSha", { length: 80 }),
   url: text("url"),
   errorMessage: text("errorMessage"),
@@ -254,28 +254,28 @@ export const deployments = mysqlTable("deployments", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => ({ purchaseIdx: index("deployments_purchase_idx").on(table.purchaseId), statusIdx: index("deployments_status_idx").on(table.status) }));
 
-export const automationJobs = mysqlTable("automation_jobs", {
-  id: int("id").autoincrement().primaryKey(),
+export const automationJobs = pgTable("automation_jobs", {
+  id: serial("id").primaryKey(),
   type: varchar("type", { length: 100 }).notNull(),
-  status: mysqlEnum("status", ["queued", "running", "succeeded", "failed", "dead_letter"]).default("queued").notNull(),
+  status: text("status").default("queued").notNull(),
   correlationId: varchar("correlationId", { length: 100 }).notNull(),
   payload: text("payload").notNull(),
-  attempts: int("attempts").default(0).notNull(),
-  maxAttempts: int("maxAttempts").default(5).notNull(),
+  attempts: integer("attempts").default(0).notNull(),
+  maxAttempts: integer("maxAttempts").default(5).notNull(),
   lastError: text("lastError"),
   runAfter: timestamp("runAfter").defaultNow().notNull(),
   lockedAt: timestamp("lockedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (table) => ({ statusIdx: index("automation_jobs_status_idx").on(table.status), correlationIdx: index("automation_jobs_correlation_idx").on(table.correlationId) }));
 
 
-export const customerInstances = mysqlTable("customer_instances", {
-  id: int("id").autoincrement().primaryKey(),
-  purchaseId: int("purchaseId").notNull().references(() => customerPurchases.id, { onDelete: "cascade" }),
-  productId: int("productId").notNull().references(() => products.id),
-  productVersionId: int("productVersionId").references(() => productVersions.id),
-  customerId: int("customerId").notNull().references(() => users.id, { onDelete: "cascade" }),
+export const customerInstances = pgTable("customer_instances", {
+  id: serial("id").primaryKey(),
+  purchaseId: integer("purchaseId").notNull().references(() => customerPurchases.id, { onDelete: "cascade" }),
+  productId: integer("productId").notNull().references(() => products.id),
+  productVersionId: integer("productVersionId").references(() => productVersions.id),
+  customerId: integer("customerId").notNull().references(() => users.id, { onDelete: "cascade" }),
   githubRepository: varchar("githubRepository", { length: 320 }),
   githubCommit: varchar("githubCommit", { length: 80 }),
   sourceChecksum: varchar("sourceChecksum", { length: 120 }),
@@ -286,26 +286,23 @@ export const customerInstances = mysqlTable("customer_instances", {
   domain: varchar("domain", { length: 320 }),
   instanceUrl: text("instanceUrl"),
   adminUrl: text("adminUrl"),
-  environment: mysqlEnum("environment", ["development", "staging", "production"]).default("production").notNull(),
-  status: mysqlEnum("status", [
-    "creating", "provisioning", "deploying", "health_checking",
-    "ready", "degraded", "failed", "rolling_back", "suspended", "archived"
-  ]).default("creating").notNull(),
-  healthStatus: mysqlEnum("healthStatus", ["unknown", "healthy", "unhealthy"]).default("unknown").notNull(),
+  environment: text("environment").default("production").notNull(),
+  status: text("status").default("creating").notNull(),
+  healthStatus: text("healthStatus").default("unknown").notNull(),
   lastError: text("lastError"),
   sagaStep: varchar("sagaStep", { length: 80 }),
   metadata: text("metadata"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (table) => ({
   purchaseIdx: uniqueIndex("customer_instances_purchase_unique").on(table.purchaseId),
   customerIdx: index("customer_instances_customer_idx").on(table.customerId),
   statusIdx: index("customer_instances_status_idx").on(table.status),
 }));
 
-export const auditLogs = mysqlTable("audit_logs", {
-  id: int("id").autoincrement().primaryKey(),
-  actorUserId: int("actorUserId").references(() => users.id),
+export const auditLogs = pgTable("audit_logs", {
+  id: serial("id").primaryKey(),
+  actorUserId: integer("actorUserId").references(() => users.id),
   action: varchar("action", { length: 120 }).notNull(),
   entityType: varchar("entityType", { length: 80 }).notNull(),
   entityId: varchar("entityId", { length: 80 }),
@@ -313,11 +310,11 @@ export const auditLogs = mysqlTable("audit_logs", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 }, (table) => ({ actorIdx: index("audit_actor_idx").on(table.actorUserId), actionIdx: index("audit_action_idx").on(table.action) }));
 
-export const adminSettings = mysqlTable("admin_settings", {
-  id: int("id").autoincrement().primaryKey(),
+export const adminSettings = pgTable("admin_settings", {
+  id: serial("id").primaryKey(),
   key: varchar("key", { length: 120 }).notNull().unique(),
   value: text("value").notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 export type User = typeof users.$inferSelect;
