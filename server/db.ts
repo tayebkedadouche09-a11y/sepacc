@@ -232,8 +232,8 @@ export async function getPaymentOrderForUser(userId: number, orderId: number) {
 export async function recordCheckoutSession(userId: number, orderId: number, sessionId: string, provider = "stripe") {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  const result = await db.update(orders).set({ provider, providerReference: sessionId }).where(and(eq(orders.id, orderId), eq(orders.userId, userId), eq(orders.status, "pending")));
-  return { orderId, sessionId, recorded: result[0]?.affectedRows !== 0 };
+  const result = await db.update(orders).set({ provider, providerReference: sessionId }).where(and(eq(orders.id, orderId), eq(orders.userId, userId), eq(orders.status, "pending"))).returning({ id: orders.id });
+  return { orderId, sessionId, recorded: result.length !== 0 };
 }
 
 export async function markOrderPaid(orderId: number, providerPaymentId: string, eventId?: string, provider = "stripe", verifiedAmountMinor?: number, verifiedCurrency?: string) {
@@ -343,7 +343,7 @@ export async function attemptAutomaticProvisioning(purchaseId: number, orderId: 
     productSlug: row.product.slug,
     sourceRepoUrl: row.product.sourceRepoUrl,
     sourceRepoBranch: row.product.sourceRepoBranch,
-    mode: row.product.provisioningMode,
+    mode: row.product.provisioningMode as "manual" | "external" | "native",
   });
 
   if (!response) {
