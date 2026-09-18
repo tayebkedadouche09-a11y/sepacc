@@ -1,6 +1,7 @@
 import crypto from "node:crypto";
 import { and, asc, desc, eq, inArray, like, or, sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import {
   InsertUser,
   Product,
@@ -37,7 +38,7 @@ let seedPromise: Promise<void> | null = null;
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      _db = drizzle(postgres(process.env.DATABASE_URL));
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -73,7 +74,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   }
   values.lastSignedIn ??= new Date();
   if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
-  await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+  await db.insert(users).values(values).onConflictDoUpdate({ target: users.openId, set: updateSet });
 }
 
 export async function getUserByOpenId(openId: string) {
@@ -87,7 +88,7 @@ async function seedCategories() {
   const db = await getDb();
   if (!db) return;
   for (const category of categorySeed) {
-    await db.insert(categories).values(category).onDuplicateKeyUpdate({ set: { name: category.name, description: category.description, sortOrder: category.sortOrder } });
+    await db.insert(categories).values(category).onConflictDoUpdate({ target: categories.slug, set: { name: category.name, description: category.description, sortOrder: category.sortOrder } });
     const row = (await db.select({ id: categories.id }).from(categories).where(eq(categories.slug, category.slug)).limit(1))[0];
     if (row) await db.update(products).set({ categoryId: row.id }).where(eq(products.category, category.name));
   }
@@ -117,8 +118,8 @@ async function seedCatalog() {
       faq: item.faq,
       seoTitle: item.seoTitle,
       seoDescription: item.seoDescription,
-    });
-    const productId = Number(inserted[0]?.insertId);
+    }).returning({ id: products.id });
+    const productId = Number(inserted[0]?.id);
     if (!productId) continue;
     await db.insert(productFeatures).values(item.features.map(([title, description], index) => ({ productId, title, description, sortOrder: index })));
     await db.insert(productTechStack).values(item.tech.map((name, index) => ({ productId, name, sortOrder: index })));
@@ -207,10 +208,10 @@ export async function createPendingOrder(userId: number, product: Product) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
   return db.transaction(async (tx) => {
-    const orderResult = await tx.insert(orders).values({ userId, subtotal: product.price, currency: product.currency, status: "pending" });
-    const orderId = Number(orderResult[0]?.insertId);
-    const itemResult = await tx.insert(orderItems).values({ orderId, productId: product.id, productName: product.name, unitPrice: product.price });
-    const orderItemId = Number(itemResult[0]?.insertId);
+    const orderResult = await tx.insert(orders).values({ userId, subtotal: product.price, currency: product.currency, status: "pending" }).returning({ id: orders.id });
+    const orderId = Number(orderResult[0]?.id);
+    const itemResult = await tx.insert(orderItems).values({ orderId, productId: product.id, productName: product.name, unitPrice: product.price }).returning({ id: orderItems.id });
+    const orderItemId = Number(itemResult[0]?.id);
     await tx.insert(payments).values({ orderId, amount: product.price, currency: product.currency, status: "pending" });
     return { orderId, orderItemId, status: "pending" as const };
   });
@@ -254,8 +255,8 @@ export async function markOrderPaid(orderId: number, providerPaymentId: string, 
     let purchaseId = existing?.id;
     if (!existing) {
       const licenseKey = `NUMI-${crypto.randomUUID().replaceAll("-", "").slice(0, 24).toUpperCase()}`;
-      const purchase = await tx.insert(customerPurchases).values({ userId: row.order.userId, productId: row.item.productId, orderItemId: row.item.id, licenseKey, accessGranted: false });
-      purchaseId = Number(purchase[0]?.insertId);
+      const purchase = await tx.insert(customerPurchases).values({ userId: row.order.userId, productId: row.item.productId, orderItemId: row.item.id, licenseKey, accessGranted: false }).returning({ id: customerPurchases.id });
+      purchaseId = Number(purchase[0]?.id);
       await tx.insert(deliveries).values({ purchaseId, status: "queued" });
       await tx.insert(licenses).values({ purchaseId, licenseKey, type: row.item.licenseType });
     }
@@ -273,14 +274,14 @@ export async function enqueueProvisioningJob(purchaseId: number, orderId: number
   const correlationId = `purchase-${purchaseId}`;
   const existing = (await db.select({ id: automationJobs.id }).from(automationJobs).where(and(eq(automationJobs.type, "provision_purchase"), eq(automationJobs.correlationId, correlationId), inArray(automationJobs.status, ["queued", "running", "succeeded"]))).limit(1))[0];
   if (existing) return existing.id;
-  const inserted = await db.insert(automationJobs).values({ type: "provision_purchase", correlationId, payload: JSON.stringify({ purchaseId, orderId }), maxAttempts: 5, status: "queued" });
-  return Number(inserted[0]?.insertId);
+  const inserted = await db.insert(automationJobs).values({ type: "provision_purchase", correlationId, payload: JSON.stringify({ purchaseId, orderId }), maxAttempts: 5, status: "queued" }).returning({ id: automationJobs.id });
+  return Number(inserted[0]?.id);
 }
 
 export async function processAutomationJobs(limit = 3) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  const jobs = await db.select().from(automationJobs).where(and(eq(automationJobs.status, "queued"), sql`${automationJobs.runAfter} <= NOW()`)).orderBy(asc(automationJobs.runAfter)).limit(Math.max(1, Math.min(limit, 10)));
+  const jobs = await db.select().from(automationJobs).where(and(eq(automationJobs.status, "queued"), sql`${automationJobs.runAfter} <= now()`)).orderBy(asc(automationJobs.runAfter)).limit(Math.max(1, Math.min(limit, 10)));
   const results: Array<{ id: number; status: string; error?: string }> = [];
   for (const job of jobs) {
     const claimed = await db.update(automationJobs).set({ status: "running", lockedAt: new Date(), attempts: sql`${automationJobs.attempts} + 1` }).where(and(eq(automationJobs.id, job.id), eq(automationJobs.status, "queued")));
@@ -323,8 +324,8 @@ export async function attemptAutomaticProvisioning(purchaseId: number, orderId: 
       healthStatus: "unknown",
       sagaStep: "INSTANCE_CREATED",
       environment: "production",
-    });
-    const id = Number(inserted[0]?.insertId);
+    }).returning({ id: customerInstances.id });
+    const id = Number(inserted[0]?.id);
     instance = (await db.select().from(customerInstances).where(eq(customerInstances.id, id)).limit(1))[0];
   } else if (instance.status === "ready" && instance.instanceUrl) {
     return { purchaseId, status: "ready" as const, configured: true, idempotent: true, instanceId: instance.id };
@@ -611,8 +612,8 @@ export type AdminCategoryInput = { name: string; slug: string; description?: str
 export async function createAdminCategory(actorUserId: number, input: AdminCategoryInput) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  const result = await db.insert(categories).values({ ...input, description: input.description || null });
-  const id = Number(result[0]?.insertId);
+  const result = await db.insert(categories).values({ ...input, description: input.description || null }).returning({ id: categories.id });
+  const id = Number(result[0]?.id);
   await recordAudit(actorUserId, "category.create", "category", id, { slug: input.slug });
   return id;
 }
@@ -675,8 +676,8 @@ export async function createAdminProduct(actorUserId: number, input: AdminProduc
       license: input.license || null,
       included: input.included || null,
       faq: input.faq || null,
-    });
-    const productId = Number(inserted[0]?.insertId);
+    }).returning({ id: products.id });
+    const productId = Number(inserted[0]?.id);
     if (input.features.length) await tx.insert(productFeatures).values(input.features.map((feature, index) => ({ productId, title: feature.title, description: feature.description, sortOrder: index })));
     if (input.techStack.length) await tx.insert(productTechStack).values(input.techStack.map((stack, index) => ({ productId, name: stack.name, category: stack.category || null, sortOrder: index })));
     return productId;
@@ -794,8 +795,8 @@ export async function createCustomerReview(userId: number, input: { productId: n
   if (!purchase) throw new Error("Only verified purchasers can review this product.");
   const existing = (await db.select({ id: reviews.id }).from(reviews).where(and(eq(reviews.userId, userId), eq(reviews.productId, input.productId))).limit(1))[0];
   if (existing) throw new Error("You already reviewed this product.");
-  const inserted = await db.insert(reviews).values({ productId: input.productId, userId, rating: input.rating, title: input.title || null, body: input.body || null, status: "pending" });
-  return { reviewId: Number(inserted[0]?.insertId), status: "pending" as const };
+  const inserted = await db.insert(reviews).values({ productId: input.productId, userId, rating: input.rating, title: input.title || null, body: input.body || null, status: "pending" }).returning({ id: reviews.id });
+  return { reviewId: Number(inserted[0]?.id), status: "pending" as const };
 }
 
 export async function listAdminReviews() {
@@ -821,8 +822,8 @@ export async function listAdminCoupons() {
 export async function createAdminCoupon(actorUserId: number, input: { code: string; discountType: "percent" | "fixed"; discountValue: string; expiresAt?: Date | null; maxUses?: number | null }) {
   const db = await getDb();
   if (!db) throw new Error("Database unavailable");
-  const inserted = await db.insert(coupons).values({ code: input.code.trim().toUpperCase(), discountType: input.discountType, discountValue: input.discountValue, expiresAt: input.expiresAt || null, maxUses: input.maxUses ?? null, active: true });
-  const id = Number(inserted[0]?.insertId);
+  const inserted = await db.insert(coupons).values({ code: input.code.trim().toUpperCase(), discountType: input.discountType, discountValue: input.discountValue, expiresAt: input.expiresAt || null, maxUses: input.maxUses ?? null, active: true }).returning({ id: coupons.id });
+  const id = Number(inserted[0]?.id);
   await recordAudit(actorUserId, "coupon.create", "coupon", id, { code: input.code });
   return { id };
 }
