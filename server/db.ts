@@ -285,7 +285,7 @@ export async function processAutomationJobs(limit = 3) {
   const results: Array<{ id: number; status: string; error?: string }> = [];
   for (const job of jobs) {
     const claimed = await db.update(automationJobs).set({ status: "running", lockedAt: new Date(), attempts: sql`${automationJobs.attempts} + 1` }).where(and(eq(automationJobs.id, job.id), eq(automationJobs.status, "queued")));
-    if (Number(claimed[0]?.affectedRows ?? 0) !== 1) continue;
+    if (claimed.length !== 1) continue;
     try {
       const payload = JSON.parse(job.payload) as { purchaseId: number; orderId: number };
       await attemptAutomaticProvisioning(payload.purchaseId, payload.orderId, 0, "");
