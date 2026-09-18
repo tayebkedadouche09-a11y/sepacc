@@ -12,7 +12,7 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit generate && drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
     "db:seed": "tsx server/seed.ts",
     "preflight": "tsx server/preflight.ts",
     "setup": "tsx server/setup.ts",
