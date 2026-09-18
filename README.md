@@ -99,4 +99,4 @@ READY only if health + source + license evidence exist.
 
 ## Stack
 
-React · Vite · tRPC · Express · Drizzle · MySQL · Stripe / Chargily / PayPal · GitHub · Vercel
+React · Vite · tRPC · Express · Drizzle · PostgreSQL / Supabase · Stripe / Chargily / PayPal · GitHub · Vercel
